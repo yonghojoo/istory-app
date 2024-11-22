@@ -118,8 +118,7 @@ jobs:
       # 변경사항 커밋 및 푸시
       - name: Commit and push changes
         run: |
-          cd infra-repo
-          git config --global user.name 'GitHub Actions'
-          git config --global user.email 'github-actions@github.com'
+          git config --global user.name 'dangtong76'
+          git config --global user.email 'dangtong@gmail.com'
           git commit -am "Update image tag to ${{ env.DOCKER_TAG }}"
-          git push origin main
+          git push origin tutor
