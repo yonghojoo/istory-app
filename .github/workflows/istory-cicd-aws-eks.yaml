@@ -107,7 +107,7 @@ jobs:
       - name: Checkout infrastructure repository
         uses: actions/checkout@v4
         with:
-          repository: https://github.com/dangtong-s-inc/istory-service.git  # 인프라 리포지토리
+          repository: https://github.com/dangtong-s-inc/istory-service  # 인프라 리포지토리
           path: .
       
       # 이미지 태그 업데이트
