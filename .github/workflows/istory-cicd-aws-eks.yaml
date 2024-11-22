@@ -1,4 +1,4 @@
-#5
+#6
 name: Java CI with Gradle
 
 on:
@@ -83,11 +83,11 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build -x test
 
-      - name: Copy JAR to Docker context
-        run: |
-          mkdir -p xinfra/docker/build/libs/
-          cp build/libs/*.jar xinfra/docker/build/libs/
-          ls xinfra/docker/build/libs/
+      # - name: Copy JAR to Docker context
+      #   run: |
+      #     mkdir -p xinfra/docker/build/libs/
+      #     cp build/libs/*.jar xinfra/docker/build/libs/
+      #     ls xinfra/docker/build/libs/
 
       - name: 4.Docker Image Build
         run: docker build ./xinfra/docker -t ${{ secrets.DOCKER_USERNAME }}/istory:${{ env.DOCKER_TAG }} -f ./xinfra/docker/Dockerfile
@@ -102,7 +102,6 @@ jobs:
       - name: 6.Docker Push
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/istory:${{ env.DOCKER_TAG }}
-          docker push ${{ secrets.DOCKER_USERNAME }}/istory:latest
       
       # 인프라 리포지토리 체크아웃
       - name: Checkout infrastructure repository
