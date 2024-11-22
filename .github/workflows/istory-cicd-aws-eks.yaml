@@ -1,4 +1,4 @@
-#4
+#5
 name: Java CI with Gradle
 
 on:
@@ -87,6 +87,7 @@ jobs:
         run: |
           mkdir -p xinfra/docker/build/libs/
           cp build/libs/*.jar xinfra/docker/build/libs/
+          ls xinfra/docker/build/libs/
 
       - name: 4.Docker Image Build
         run: docker build ./xinfra/docker -t ${{ secrets.DOCKER_USERNAME }}/istory:${{ env.DOCKER_TAG }} -f ./xinfra/docker/Dockerfile
