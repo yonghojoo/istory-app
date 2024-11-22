@@ -103,8 +103,8 @@ jobs:
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/istory:${{ env.DOCKER_TAG }}
       
-      # 인프라 리포지토리 체크아웃
-      - name: Checkout infrastructure repository
+      # 서비스 리포지토리 체크아웃
+      - name: 7.서비스 리포지토리 체크아웃
         uses: actions/checkout@v4
         with:
           repository: dangtong-s-inc/istory-service  
@@ -112,7 +112,7 @@ jobs:
           path: .
       
       # 이미지 태그 업데이트
-      - name: Update Kubernetes manifest
+      - name: 8.쿠버네티스 매니페스트 파일 이미지 태그 업데이트
         run: |
           # 파일이 존재하는지 확인
           ls -la
@@ -123,7 +123,7 @@ jobs:
           cat istory-app-deploy.yaml
       
       # 변경사항 커밋 및 푸시
-      - name: Commit and push changes
+      - name: 9.서비스 리포지토리 변경사항 커밋 및 푸시
         run: |
           git config --global user.name 'dangtong76'
           git config --global user.email 'dangtong@gmail.com'
