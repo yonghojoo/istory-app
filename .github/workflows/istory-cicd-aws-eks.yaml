@@ -1,4 +1,4 @@
-#2
+#4
 name: Java CI with Gradle
 
 on:
@@ -16,6 +16,9 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    env:
+      DOCKER_IMAGE: ${{ secrets.DOCKER_USERNAME }}/istory
+      DOCKER_TAG: ${{ github.run_number }}
 
     services:
       mysql:
@@ -80,8 +83,13 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build -x test
 
+      - name: Copy JAR to Docker context
+        run: |
+          mkdir -p xinfra/docker/build/libs/
+          cp build/libs/*.jar xinfra/docker/build/libs/
+
       - name: 4.Docker Image Build
-        run: docker build ./xinfra/docker -t ${{ secrets.DOCKER_USERNAME }}/istory -f ./xinfra/docker/Dockerfile
+        run: docker build ./xinfra/docker -t ${{ secrets.DOCKER_USERNAME }}/istory:${{ env.DOCKER_TAG }} -f ./xinfra/docker/Dockerfile
 
       - name: 5.Docker Login
         uses: docker/login-action@v3.0.0
@@ -91,4 +99,27 @@ jobs:
           logout: true
 
       - name: 6.Docker Push
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/istory
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/istory:${{ env.DOCKER_TAG }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/istory:latest
+      
+      # 인프라 리포지토리 체크아웃
+      - name: Checkout infrastructure repository
+        uses: actions/checkout@v4
+        with:
+          repository: https://github.com/dangtong-s-inc/istory-service.git  # 인프라 리포지토리
+          path: .
+      
+      # 이미지 태그 업데이트
+      - name: Update Kubernetes manifest
+        run: |
+          sed -i "s|image: ${{ env.DOCKER_IMAGE }}:.*|image: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}|g" istory-app-deploy.yaml
+      
+      # 변경사항 커밋 및 푸시
+      - name: Commit and push changes
+        run: |
+          cd infra-repo
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'github-actions@github.com'
+          git commit -am "Update image tag to ${{ env.DOCKER_TAG }}"
+          git push origin main
