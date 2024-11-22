@@ -117,7 +117,7 @@ jobs:
           ls -la
           # 현재 파일 내용 확인
           cat istory-app-deploy.yaml
-          sed -i "s|image: ${{ env.DOCKER_IMAGE }}:.*|image: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}|g" istory-app-deploy.yaml
+          sed -i "s|image: ${{ secrets.DOCKER_USERNAME }}/istory.*|image: ${{ secrets.DOCKER_USERNAME }}/istory:${{ env.DOCKER_TAG }}|g" istory-app-deploy.yaml
           # 변경된 내용 확인
           cat istory-app-deploy.yaml
       
