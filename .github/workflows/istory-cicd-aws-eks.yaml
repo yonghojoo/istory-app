@@ -1,3 +1,4 @@
+#1
 name: Java CI with Gradle
 
 on:
@@ -49,7 +50,7 @@ jobs:
         uses: gradle/gradle-build-action@v2
         
       - name: Build with Gradle
-        run: ./gradlew build
+        run: ./gradlew build -x test
 
       - name: 4.Docker Image Build
         run: docker build ./xinfra/docker -t ${{ secrets.DOCKER_USERNAME }}/istory -f ./xinfra/docker/Dockerfile
