@@ -1,180 +1,33 @@
-#1
-name: istory ci/cd dev pipeline
+name: Java CI with Gradle
+
+on:
+  push:
+    branches: [ "tutor" ]
+  pull_request:
+    branches: [ "tutor" ]
 
 permissions:
   contents: read
   security-events: write  # CodeQL 결과를 업로드하기 위한 권한
   actions: read
 
-on:
-  push:
-    branches: [ "develop"]
-  pull_request:
-    branches: [ "develop"]
 jobs:
-  verify_pipeline:
-    environment: runner
+  build:
+
     runs-on: ubuntu-latest
+
     services:
       mysql:
         image: mysql:8.0
         env:
           # root 계정 비밀번호
-          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }} 
           # 사용자 계정
-          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }} # user
           # 사용자 계정 비밀번호
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           # 사용자 계정 데이터베이스
-          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
-
-    steps:
-    - name: 소스코드 다운로드
-      uses: actions/checkout@v4 
-
-    - name: JDK 17 설치
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        
-    - name: change application.yml
-      run: |
-        cat > src/main/resources/application.yml << EOF
-        spring:
-          datasource:
-            url: ${{ secrets.DATABASE_URL }} # 예dbc:mysql://localhost:3306/istory
-            username: ${{ secrets.MYSQL_USER }}
-            password: ${{ secrets.MYSQL_PASSWORD }}
-            driver-class-name: com.mysql.cj.jdbc.Driver
-          jpa:
-            database-platform: org.hibernate.dialect.MySQL8Dialect
-            hibernate:
-              ddl-auto: update
-            show-sql: true
-          application:
-            name: USER-SERVICE
-          jwt:
-            issuer: user@gmail.com
-            secret_key: study-springboot
-        management:
-          endpoints:
-            web:
-              exposure:
-                include: health,info
-          endpoint:
-            health:
-              show-details: always
-        EOF
-    - name: 테스트 수행
-      run: ./gradlew test
-
-    - name: 테스트 검사 후 실패 시 파이프라인 중단
-      if: failure()
-      run: |
-        echo "Tests failed! Pipeline will be stopped."
-        exit 1
-
-    - name: 테스트 결과를 STEP Summary 에 업로드
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-report
-        path: |                    # 여러 경로 지정
-          **/build/reports/tests/test/
-          **/build/test-results/test/
-        retention-days: 30 
-
-    - name: 기본 수행정보 Step Summary 에 표시
-      run: |
-        echo "## 워크플로우 실행 정보 요약" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "* 실행 담당자: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-        echo "* 실행 이벤트: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "* 실행 저장소: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
-        echo "* 실행 브랜치: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
-
-    - name: 코드 컨벤션 규칙 검사
-      run: |
-        mkdir -p build/reports/checkstyle
-        ./gradlew checkstyleMain checkstyleTest --info
-        ls -la build/reports/checkstyle || true 
-
-    - name: 코드 컨벤션 검사 결과 업로드
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: checkstyle-report
-        path: build/reports/checkstyle/
-        retention-days: 14
-    - name: Generate list using Markdown
-      run: |
-        echo "## 코드 스타일 분석결과" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        if [ -f build/reports/checkstyle/main.xml ]; then # 소스분석결과 존재시
-          echo "### 소스분석결과" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat build/reports/checkstyle/main.xml >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-        fi
-    - name: CodeQL 초기화
-      uses: github/codeql-action/init@v3
-      with:
-        languages: java
-        queries: security-and-quality
-
-    - name: 코드 빌드
-      uses: github/codeql-action/autobuild@v3
-
-    - name: 보안 취약점 분석
-      uses: github/codeql-action/analyze@v3
-      with:
-        category: "/language:java"
-        output: sarif-results
-
-    - name: 보안취약점 분석 요약
-      run: |
-        echo "# 파이프라인 리포트" >> $GITHUB_STEP_SUMMARY
-        echo "## 보안 경고" >> $GITHUB_STEP_SUMMARY
-        
-        if [ -f sarif-results/java.sarif ]; then
-          if jq -e '.runs[0].results' sarif-results/java.sarif > /dev/null 2>&1; then
-            ALERTS=$(jq '.runs[].results | length' sarif-results/java.sarif)
-            echo "${ALERTS}개의 잠재적인 보안 이슈가 발견 되었습니다." >> $GITHUB_STEP_SUMMARY
-            
-            echo "### 보안 경고 상세" >> $GITHUB_STEP_SUMMARY
-            echo "| Severity | Rule | Description | File |" >> $GITHUB_STEP_SUMMARY
-            echo "|----------|------|-------------|------|" >> $GITHUB_STEP_SUMMARY
-            
-            jq -r '.runs[].results[] | "| \(.properties.security_severity // "medium") | \(.ruleId // "N/A") | \(.message.text // "N/A") | \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine) |"' sarif-results/java.sarif >> $GITHUB_STEP_SUMMARY || true
-          else
-            echo "No results found in SARIF file." >> $GITHUB_STEP_SUMMARY
-          fi
-        else
-          echo "No SARIF results file found." >> $GITHUB_STEP_SUMMARY
-        fi
-  load-test:
-    runs-on: ubuntu-latest
-    environment: runner
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          # root 계정 비밀번호
-          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-          # 사용자 계정
-          MYSQL_USER: ${{ secrets.MYSQL_USER }}
-          # 사용자 계정 비밀번호
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          # 사용자 계정 데이터베이스
-          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }} # istory
         ports:
           - 3306:3306
         options: >-
@@ -183,190 +36,30 @@ jobs:
           --health-timeout=5s
           --health-retries=3
     steps:
-    - name: 배포용 소스 다운로드
-      uses: actions/checkout@v4
-      
-    - name: JDK 17 설치
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
+      - name: 소스코드 다운로드
+        uses: actions/checkout@v4 
 
-    - name: change application.yml
-      run: |
-        cat > src/main/resources/application.yml << EOF
-        spring:
-          datasource:
-            url: ${{ secrets.DATABASE_URL }} # 예dbc:mysql://localhost:3306/istory
-            username: ${{ secrets.MYSQL_USER }}
-            password: ${{ secrets.MYSQL_PASSWORD }}
-            driver-class-name: com.mysql.cj.jdbc.Driver
-          jpa:
-            database-platform: org.hibernate.dialect.MySQL8Dialect
-            hibernate:
-              ddl-auto: update
-            show-sql: true
-          application:
-            name: USER-SERVICE
-          jwt:
-            issuer: user@gmail.com
-            secret_key: study-springboot
-        management:
-          endpoints:
-            web:
-              exposure:
-                include: health,info
-          endpoint:
-            health:
-              show-details: always
-        EOF
-    - name: Build 
-      run: |
-        ./gradlew bootJar
-    - name: Run Spring Boot
-      run: |
-        nohup java -jar build/libs/*.jar &
-        sleep 10  # 애플리케이션이 완전히 시작될 때까지 대기
-    - name: Install k6
-      run: |
-        curl -L https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-amd64.tar.gz -o k6.tar.gz
-        tar -xzf k6.tar.gz
-        sudo cp k6-v0.49.0-linux-amd64/k6 /usr/local/bin/
-
-    - name: Run k6 load test
-      run: |
-        # k6 실행 결과를 파일로 저장
-        k6 run src/test/load/load-test.js > k6_results.txt
-        
-        # GitHub Step Summary에 k6 결과 추가
-        echo "## 부하 테스트 결과" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        cat k6_results.txt >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        
-        # JSON 형식으로도 결과 저장 (선택사항)
-        k6 run --out json=results.json src/test/load/load-test.js
-        
-        # 주요 메트릭 요약 추가
-        echo "### 주요 메트릭 요약" >> $GITHUB_STEP_SUMMARY
-        echo "| 메트릭 | 결과 |" >> $GITHUB_STEP_SUMMARY
-        echo "|--------|------|" >> $GITHUB_STEP_SUMMARY
-        echo "| 총 요청 수 | $(grep "http_reqs" k6_results.txt | awk '{print $2}') |" >> $GITHUB_STEP_SUMMARY
-        echo "| 평균 응답 시간 | $(grep "http_req_duration" k6_results.txt | awk '{print $3}') |" >> $GITHUB_STEP_SUMMARY
-        echo "| 실패율 | $(grep "http_req_failed" k6_results.txt | awk '{print $3}') |" >> $GITHUB_STEP_SUMMARY
-      env:
-        K6_VIRTUAL_USERS: 10
-        K6_DURATION: "30s"
-
-
-  build-and-upload:
-    # needs: [verify-pipeline] 
-    runs-on: ubuntu-latest
-    environment: dev
-    steps:
-      - name: 배포용 소스 다운로드
-        uses: actions/checkout@v4
-
-      - name: 개발용 application.yml 생성
-        run: |
-          cat > src/main/resources/application.yml << EOF
-          spring:
-            datasource:
-              url: ${{ secrets.DATABASE_URL }} # 예dbc:mysql://localhost:3306/istory
-              username: ${{ secrets.MYSQL_USER }}
-              password: ${{ secrets.MYSQL_PASSWORD }}
-              driver-class-name: com.mysql.cj.jdbc.Driver
-            jpa:
-              database-platform: org.hibernate.dialect.MySQL8Dialect
-              hibernate:
-                ddl-auto: update
-              show-sql: true
-            application:
-              name: USER-SERVICE
-            jwt:
-              issuer: user@gmail.com
-              secret_key: study-springboot
-          management:
-            endpoints:
-              web:
-                exposure:
-                  include: health,info
-            endpoint:
-              health:
-                show-details: always
-          EOF
-      - name: AWS 접속정보 설정
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-2  # 
-      - name: Set up JDK 17
+      - name: JDK 17 설치
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        
       - name: Build with Gradle
-        run: |
-          chmod +x gradlew
-          ./gradlew bootJar
-          
-      - name: Generate artifact name with timestamp
-        run: |
-          echo "ARTIFACT_NAME=springboot-$(date +'%Y%m%d-%H%M%S').jar" >> $GITHUB_ENV
+        run: ./gradlew build
 
-      - name: Create deployment package
-        run: |
-          mkdir -p deployment
-          cp build/libs/*.jar deployment/${{ env.ARTIFACT_NAME }}
-          cp appspec.yml deployment/
-          cp -r scripts deployment/
-          cd deployment && zip -r ../deploy.zip .          
+      - name: 4.Docker Image Build
+        run: docker build ./xinfra/docker -t ${{ secrets.DOCKER_USERNAME }}/istory -f ./xinfra/docker/Dockerfile
 
-      - name: S3 업로드
-        run: |
-          # JAR 파일 업로드
-          aws s3 cp deployment/${{ env.ARTIFACT_NAME }} s3://${{ secrets.AWS_S3_BUCKET }}/artifacts/
-          # 배포 패키지 업로드
-          aws s3 cp deploy.zip s3://${{ secrets.AWS_S3_BUCKET }}/deploy/deploy.zip
-      
-      - name: 배포 기본정보 표시
-        run: |
-          echo "## 📦 배포 정보" >> $GITHUB_STEP_SUMMARY
-          echo "| 항목 | 내용 |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 🎯 버킷 | \`${{ secrets.AWS_S3_BUCKET }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 📄 파일명 | \`${{ env.ARTIFACT_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🕒 배포 시각 | $(date) |" >> $GITHUB_STEP_SUMMARY
-      - name: 기존 진행중인 배포 삭제
-        run: |
-          DEPLOYMENTS=$(aws deploy list-deployments \
-            --application-name istory-app \
-            --deployment-group-name istory-deploy-group \
-            --include-only-statuses "InProgress" \
-            --query 'deployments[]' \
-            --output text)
-          
-          if [ ! -z "$DEPLOYMENTS" ]; then
-            for deployment in $DEPLOYMENTS; do
-              echo "Stopping deployment $deployment"
-              aws deploy stop-deployment --deployment-id $deployment
-            done
-            # 잠시 대기하여 취소가 완료되도록 함
-            sleep 10
-          fi
-      - name: EC2 배포 수행
-        id: deploy
-        run: |
-          DEPLOYMENT_ID=$(aws deploy create-deployment \
-            --application-name istory-app \
-            --deployment-group-name istory-deploy-group \
-            --s3-location bucket=${{ secrets.AWS_S3_BUCKET }},key=deploy/deploy.zip,bundleType=zip \
-            --output text \
-            --query 'deploymentId')
-          echo "deployment_id=${DEPLOYMENT_ID}" >> $GITHUB_OUTPUT
+      - name: 5.Docker Login
+        uses: docker/login-action@v3.0.0
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+          logout: true
 
-      - name: 배포 최종 성공 확인
-        run: |
-          aws deploy wait deployment-successful --deployment-id ${{ steps.deploy.outputs.deployment_id }}
+      - name: 6.Docker Push
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/istory
