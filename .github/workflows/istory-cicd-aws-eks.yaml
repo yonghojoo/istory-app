@@ -113,7 +113,13 @@ jobs:
       # 이미지 태그 업데이트
       - name: Update Kubernetes manifest
         run: |
+         # 파일이 존재하는지 확인
+          ls -la
+          # 현재 파일 내용 확인
+          cat istory-app-deploy.yaml
           sed -i "s|image: ${{ env.DOCKER_IMAGE }}:.*|image: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}|g" istory-app-deploy.yaml
+          # 변경된 내용 확인
+          cat istory-app-deploy.yaml
       
       # 변경사항 커밋 및 푸시
       - name: Commit and push changes
