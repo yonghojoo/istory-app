@@ -105,7 +105,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: dangtong-s-inc/istory-service  
-          ref: tutor
+          ref: main
           path: .
       
       # 이미지 태그 업데이트
