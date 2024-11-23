@@ -108,7 +108,7 @@ jobs:
           repository: dangtong-s-inc/istory-service  
           ref: main
           path: .
-          token: ${{ secrets.PAT }} 
+          # token: ${{ secrets.PAT }} 
       
       # 이미지 태그 업데이트
       - name: 11.쿠버네티스 매니페스트 파일 이미지 태그 업데이트
