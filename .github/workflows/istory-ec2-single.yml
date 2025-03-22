@@ -6,7 +6,6 @@ permissions:
   security-events: write  # CodeQL 결과를 업로드하기 위한 권한
   actions: read
 
-  
 on:
   push:
     branches: [ "main"]
